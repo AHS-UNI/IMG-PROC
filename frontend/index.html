@@ -1,0 +1,30 @@
+<!-- frontend/index.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Image Metadata and Histograms</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <h1>Image Metadata and Histograms</h1>
+  <input type="file" id="imageInput" accept="image/*" />
+  <div id="imageContainer" style="display:none;">
+    <h2>Uploaded Image</h2>
+    <img id="uploadedImage" src="#" alt="Uploaded Image" />
+    <h3>Metadata</h3>
+    <pre id="metadata"></pre>
+    <h3>Histograms</h3>
+    <div id="histograms">
+      <img id="histogramR" src="#" alt="Histogram R" />
+      <img id="histogramG" src="#" alt="Histogram G" />
+      <img id="histogramB" src="#" alt="Histogram B" />
+    </div>
+  </div>
+  <!-- Placeholder for operations -->
+  <div id="operations">
+    <!-- Future implementation -->
+  </div>
+  <script src="script.js"></script>
+</body>
+</html>

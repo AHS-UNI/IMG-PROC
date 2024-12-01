@@ -1,0 +1,6 @@
+test_images/
+venv/
+.vscode/
+
+links.txt
+temp.txt
