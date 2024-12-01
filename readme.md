@@ -1,4 +1,4 @@
-# IMG-PROC: A Image Processing API
+# IMG-PROC: Image Processing API
 
 Built using Pillow, NumPy, and FastAPI (see requirements.txt for more detail)
 
