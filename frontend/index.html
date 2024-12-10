@@ -1,30 +1,462 @@
-<!-- frontend/index.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Image Metadata and Histograms</title>
-  <link rel="stylesheet" href="styles.css">
+    <meta charset="UTF-8">
+    <title>IMG-PROC</title>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <h1>Image Metadata and Histograms</h1>
-  <input type="file" id="imageInput" accept="image/*" />
-  <div id="imageContainer" style="display:none;">
-    <h2>Uploaded Image</h2>
-    <img id="uploadedImage" src="#" alt="Uploaded Image" />
-    <h3>Metadata</h3>
-    <pre id="metadata"></pre>
-    <h3>Histograms</h3>
-    <div id="histograms">
-      <img id="histogramR" src="#" alt="Histogram R" />
-      <img id="histogramG" src="#" alt="Histogram G" />
-      <img id="histogramB" src="#" alt="Histogram B" />
+    <div id="main-container">
+        <div class="container" id="header-container">
+            <header>
+                <div id="title">IMG-PROC</div>
+                <div id="footnote">AHS</div>
+            </header>
+        </div>
+
+        <div class="container" id="image-management-container">
+            <div class="container-header" id="image-management-container-header">Image Management</div>
+            <div class="block" id="upload-image-block">
+                <div class="block-header" id="upload-image-block-header">Upload Image</div>
+                <input type="file" id="upload-image-file-input">
+                <button id="upload-image-button">Upload</button>
+            </div>
+
+            <div class="block" id="create-image-block">
+                <div class="block-header" id="create-image-block-header">Create Image</div>
+                <div class="settings" id="create-image-settings">
+                    <label for="create-image-width-input">Width:</label>
+                    <input type="number" id="create-image-width-input">
+                    <label for="create-image-height-input">Height:</label>
+                    <input type="number" id="create-image-height-input">
+                    <label for="create-image-color-input">Color:</label>
+                    <select id="create-image-color-input">
+                        <option value="black">Black</option>
+                        <option value="white">White</option>
+                    </select>
+                </div>
+                <button id="create-image-button">Create Image</button>
+            </div>
+
+            <div class="block" id="images-block">
+                <div class="block-header" id="images-block-header">Images</div>
+                <div id="image-list"></div>
+                <div class="settings" id="images-settings">
+                    <button id="load-image-button">Load Image</button>
+                    <button id="delete-image-button">Delete Image</button>
+                </div>
+            </div>
+        </div>
+            
+        <div class="container" id="workspace-grid-container">
+            <div class="container-header" id="workspace-gird-container-header">Workspace</div>
+            <div id="workspace-column-1">
+                <div class="block" id="workspace-block">
+                    <img id="workspace-image" onmousemove="cnvs_getCoordinates(event)" onmouseout="cnvs_clearCoordinates()" src="https://dummyimage.com/500x500/&text=+">
+                    <div id="workspace-coord-display">Coordinates: (X: -, Y: -)</div>    
+                </div>
+            </div>
+            <div id="workspace-column-2">
+                <div class="block" id="histogram-block">
+                    <div class="block-header" id="histogram-block-header">Histogram</div>
+                    <img id="histogram-image" onmousemove="cnvs_getXCoord(event)" onmouseout="cnvs_clearXCoord()" src="https://dummyimage.com/256x100/&text=+">
+                    <div id="histogram-x-coord-display">Pixel Value: -</div>
+                </div>
+                <div class="block" id="metadata-block">
+                    <div class="block-header" id="metadata-block-header">Metadata</div>
+                    <pre id="metadata-content"></pre>
+                </div>
+                <div class="settings" id="workspace-settings">
+                    <button id="clear-workspace-button">Clear Workspace</button>
+                    <button id="save-workspace-button">Save Image</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="container" id="operations-container">
+            <div class="container-header" id="operations-container-header">Operations</div>
+            <div id="operation-tabs">
+                <button class="operation-tab-link" data-tab="color-operation-tab">Color</button>
+                <button class="operation-tab-link" data-tab="halftoning-operation-tab">Halftoning</button>
+                <button class="operation-tab-link" data-tab="histogram-operation-tab">Histogram</button>
+                <button class="operation-tab-link" data-tab="edge-detection-tab">Edge Detection</button>
+                <button class="operation-tab-link" data-tab="filtering-tab">Filter</button>
+                <button class="operation-tab-link" data-tab="segmentation-tab">Segmentation</button>
+                <button class="operation-tab-link" data-tab="image-operations-tab">Image Operations</button>
+                <button class="operation-tab-link" data-tab="operation-history-tab" id="operation-history-tab-link">Operation History</button>
+            </div>
+        
+            <div class="operation-tab-content" id="color-operation-tab">
+                <div class="block operation-block" id="grayscale-block">
+                    <div class="block-header operation-block-header">Grayscale</div>
+                    <div class="operation-settings">
+                        <div class="settings operation-main-settings">
+                            <label for="grayscale-mode-input">Mode:</label>
+                            <select id="grayscale-mode-input" data-extra-setting="grayscale-mode">
+                                <option value="" selected>-</option>
+                                <option value="lightness">Lightness</option>
+                                <option value="luminosity">Luminosity</option>
+                            </select>
+                        </div>
+                        <div class="operation-extra-settings">
+                        </div>
+                    </div>
+                    <div class="operation-message" id="grayscale-message"></div>
+                    <button class="apply-operation-button" id="apply-grayscale-button">Apply</button>
+                </div>
+            </div>
+        
+            <div class="operation-tab-content" id="halftoning-operation-tab">
+                <div class="block operation-block" id="halftoning-block">
+                    <div class="block-header operation-block-header">Halftoning</div>
+                    <div class="operation-settings">
+                        <div class="settings operation-main-settings">
+                            <label for="halftoning-color-mode-input">Color Mode:</label>
+                            <select id="halftoning-color-mode-input" data-extra-setting="halftoning-color-mode">
+                                <option value="" selected>-</option>
+                                <option value="rgb">RGB</option>
+                                <option value="grayscale">Grayscale</option>
+                            </select>
+        
+                            <label for="halftoning-method-input">Method:</label>
+                            <select id="halftoning-method-input" data-extra-setting="halftoning-method">
+                                <option value="" selected>-</option>
+                                <option value="thresholding">Thresholding</option>
+                                <option value="error_diffusion">Error-Diffusion</option>
+                            </select>
+                        </div>
+        
+                        <div class="operation-extra-settings">
+                            <div class="settings extra-setting" data-extra-setting="halftoning-color-mode" data-extra-value="grayscale">
+                                <label for="halftoning-grayscale-threshold-input">Threshold:</label>
+                                <input type="number" id="halftoning-grayscale-threshold-input">
+                            </div>
+        
+                            <div class="settings extra-setting" data-extra-setting="halftoning-color-mode" data-extra-value="rgb">
+                                <label for="halftoning-r-threshold-input">R-Channel Threshold:</label>
+                                <input type="number" id="halftoning-r-threshold-input">
+        
+                                <label for="halftoning-g-threshold-input">G-Channel Threshold:</label>
+                                <input type="number" id="halftoning-g-threshold-input">
+        
+                                <label for="halftoning-b-threshold-input">B-Channel Threshold:</label>
+                                <input type="number" id="halftoning-b-threshold-input">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="operation-message" id="halftoning-message"></div>
+                    <button class="apply-operation-button" id="apply-halftoning-button">Apply</button>
+                </div>
+            </div>
+        
+            <div class="operation-tab-content" id="histogram-operation-tab">
+                <div class="block operation-block" id="histogram-equalization-block">
+                    <div class="block-header operation-block-header">Histogram Equalization</div>
+                    <div class="operation-settings">
+                        <div class="settings operation-main-settings">
+                            <label for="histogram-equalization-color-mode-input">Color Mode:</label>
+                            <select id="histogram-equalization-color-mode-input" data-extra-setting="histogram-equalization-color-mode">
+                                <option value="" selected>-</option>
+                                <option value="rgb">RGB</option>
+                                <option value="grayscale">Grayscale</option>
+                            </select>
+                        </div>
+                        <div class="operation-extra-settings">
+                        </div>
+                    </div>
+                    <div class="operation-message" id="histogram-equalization-message"></div>
+                    <button class="apply-operation-button" id="apply-histogram-equalization-button">Apply</button>
+                </div>
+        
+                <div class="block operation-block" id="histogram-smoothing-block">
+                    <div class="block-header operation-block-header">Histogram Smoothing</div>
+                    <div class="operation-settings">
+                        <div class="settings operation-main-settings">
+                            <label for="histogram-smoothing-color-mode-input">Color Mode:</label>
+                            <select id="histogram-smoothing-color-mode-input" data-extra-setting="histogram-smoothing-color-mode">
+                                <option value="" selected>-</option>
+                                <option value="rgb">RGB</option>
+                                <option value="grayscale">Grayscale</option>
+                            </select>
+            
+                            <label for="histogram-smoothing-kernel-size-input">Kernel Size:</label>
+                            <input type="number" id="histogram-smoothing-kernel-size-input">
+                        </div>   
+                    
+                        <div class="operation-extra-settings">
+                        </div>
+                    </div>
+                    <div class="operation-message" id="histogram-smoothing-message"></div>
+                    <button class="apply-operation-button" id="apply-histogram-smoothing-button">Apply</button>
+                </div>
+            </div>
+        
+            <div class="operation-tab-content" id="edge-detection-tab">
+                <div class="block operation-block" id="basic-edge-detection-block">
+                    <div class="block-header operation-block-header">Basic Edge Detection</div>
+                    <div class="operation-settings">
+                        <div class="settings operation-main-settings">
+                            <label for="basic-edge-detection-operator-input">Operator:</label>
+                            <select id="basic-edge-detection-operator-input" data-extra-setting="basic-edge-detection-operator">
+                                <option value="" selected>-</option>
+                                <option value="roberts">Roberts</option>
+                                <option value="sobel">Sobel</option>
+                                <option value="prewitt">Prewitt</option>
+                                <option value="kirsch">Kirsch Compass</option>
+                                <option value="robinson">Robinson Compass</option>
+                                <option value="laplacian_1">Laplacian (variant 1)</option>
+                                <option value="laplacian_2">Laplacian (variant 2)</option>
+                            </select>
+        
+                            <label for="basic-edge-detection-thresholding-input">Thresholding:</label>
+                            <input type="checkbox" id="basic-edge-detection-thresholding-input" data-extra-setting="basic-edge-detection-thresholding">
+        
+                            <label for="basic-edge-detection-contrast-input">Contrast Based:</label>
+                            <input type="checkbox" id="basic-edge-detection-contrast-input" data-extra-setting="basic-edge-detection-contrast">
+                        </div>
+        
+                        <div class="operation-extra-settings">
+                            <div class="settings extra-setting" data-extra-setting="basic-edge-detection-thresholding" data-extra-value="true">
+                                <label for="basic-edge-detection-threshold-input">Threshold:</label>
+                                <input type="number" id="basic-edge-detection-threshold-input">
+                            </div>
+        
+                            <div class="settings extra-setting" data-extra-setting="basic-edge-detection-contrast" data-extra-value="true">
+                                <label for="basic-edge-detection-contrast-kernel-size-input">Smoothing Kernel Size:</label>
+                                <input type="number" id="basic-edge-detection-smoothing-kernel-size-input">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="operation-message" id="basic-edge-detection-message"></div>
+                    <button class="apply-operation-button" id="apply-basic-edge-detection-button">Apply</button>
+                </div>
+        
+                <div class="block operation-block" id="advanced-edge-detection-block">
+                    <div class="block-header operation-block-header">Advanced Edge Detection</div>
+                    <div class="operation-settings">
+                        <div class="settings operation-main-settings">
+                            <label for="advanced-edge-detection-operator-input">Operator:</label>
+                            <select id="advanced-edge-detection-operator-input" data-extra-setting="advanced-edge-detection-operator">
+                                <option value="" selected>-</option>
+                                <option value="homogeneity">Homogeneity</option>
+                                <option value="difference">Difference</option>
+                                <option value="gaussian_1">Gaussian (7x7 variant)</option>
+                                <option value="gaussian_2">Gaussian (9x9 variant)</option>
+                                <option value="variance">Variance</option>
+                                <option value="range">Range</option>
+                            </select>
+        
+                            <label for="advanced-edge-detection-thresholding-input">Thresholding:</label>
+                            <input type="checkbox" id="advanced-edge-detection-thresholding-input" data-extra-setting="advanced-edge-detection-thresholding">
+        
+                            <label for="advanced-edge-detection-contrast-input">Contrast Based:</label>
+                            <input type="checkbox" id="advanced-edge-detection-contrast-input" data-extra-setting="advanced-edge-detection-contrast">
+                        </div>
+        
+                        <div class="operation-extra-settings">
+                            <div class="settings extra-setting" data-extra-setting="advanced-edge-detection-thresholding" data-extra-value="true">
+                                <label for="advanced-edge-detection-threshold-input">Threshold:</label>
+                                <input type="number" id="advanced-edge-detection-threshold-input">
+                            </div>
+        
+                            <div class="settings extra-setting" data-extra-setting="advanced-edge-detection-contrast" data-extra-value="true">
+                                <label for="advanced-edge-detection-smoothing-kernel-size-input">Smoothing Kernel Size:</label>
+                                <input type="number" id="advanced-edge-detection-smoothing-kernel-size-input">
+                            </div>
+        
+                            <div class="settings extra-setting" data-extra-setting="advanced-edge-detection-operator" data-extra-value="variance">
+                                <label for="advanced-edge-detection-kernel-size-input">Operator Kernel Size:</label>
+                                <input type="number" id="advanced-edge-detection-kernel-size-input">
+                            </div>
+        
+                            <div class="settings extra-setting" data-extra-setting="advanced-edge-detection-operator" data-extra-value="range">
+                                <label for="advanced-edge-detection-kernel-size-input">Operator Kernel Size:</label>
+                                <input type="number" id="advanced-edge-detection-kernel-size-input">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="operation-message" id="advanced-edge-detection-message"></div>
+                    <button class="apply-operation-button" id="apply-advanced-edge-detection-button">Apply</button>
+                </div>
+            </div>
+        
+            <div class="operation-tab-content" id="filtering-tab">
+                <div class="block operation-block" id="filtering-block">
+                    <div class="block-header operation-block-header">Filtering</div>
+                    <div class="operation-settings">
+                        <div class="settings operation-main-settings">
+                            <label for="filtering-mode-input">Mode:</label>
+                            <select id="filtering-mode-input" data-extra-setting="filtering-mode">
+                                <option value="" selected>-</option>
+                                <option value="high">High Pass</option>
+                                <option value="low">Low Pass</option>
+                                <option value="median">Median</option>
+                            </select>
+            
+                            <label for="filtering-kernel-size-input">Kernel Size:</label>
+                            <input type="number" id="filtering-kernel-size-input">
+        
+                        </div>
+                        <div class="operation-extra-settings">
+                            <div class="settings extra-setting" data-extra-setting="filtering-mode" data-extra-value="high">
+                                <label for="filtering-sigma-input">Sigma (Optional):</label>
+                                <input type="number" id="filtering-sigma-input" step="0.1">
+                            </div>
+                            <div class="settings extra-setting" data-extra-setting="filtering-mode" data-extra-value="low">
+                                <label for="filtering-sigma-input">Sigma (Optional):</label>
+                                <input type="number" id="filtering-sigma-input" step="0.1">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="operation-message" id="filtering-message"></div>
+                    <button class="apply-operation-button" id="apply-filtering-button">Apply</button>
+                </div>
+            </div>
+        
+            <div class="operation-tab-content" id="segmentation-tab">
+                <div class="block operation-block" id="histogram-based-segmentation-block">
+                    <div class="block-header operation-block-header">Histogram Based Segmentation</div>
+                    <div class="operation-settings">
+                        <div class="settings operation-main-settings">
+                            <label for="histogram-based-segmentation-mode-input">Mode:</label>
+                            <select id="histogram-based-segmentation-mode-input" data-extra-setting="histogram-based-segmentation-mode">
+                                <option value="" selected>-</option>
+                                <option value="manual">Manual</option>
+                                <option value="peak">Peak</option>
+                                <option value="valley">Valley</option>
+                                <option value="adaptive">Adaptive</option>
+                            </select>
+        
+                            <label for="histogram-based-segmentation-value-input">Pixel Value:</label>
+                            <input type="number" id="histogram-based-segmentation-value-input" value="255">
+        
+                            <label for="segmentation-segment-input">Region Growing:</label>
+                            <input type="checkbox" id="segmentation-segment-input" data-extra-setting="histogram-based-segmentation-region-growing">
+                        </div>
+        
+                        <div class="operation-extra-settings">
+                            <div class="settings extra-setting" data-extra-setting="histogram-based-segmentation-mode" data-extra-value="manual">
+                                <label for="histogram-based-segmentation-hi-input">High Threshold:</label>
+                                <input type="number" id="histogram-based-segmentation-hi-input">
+        
+                                <label for="histogram-based-segmentation-low-input">Low Threshold:</label>
+                                <input type="number" id="histogram-based-segmentation-low-input">
+                            </div>
+        
+                            <div class="settings extra-setting" data-extra-setting="histogram-based-segmentation-region-growing" data-extra-value="true">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="operation-message" id="histogram-based-segmentation-message"></div>
+                    <button class="apply-operation-button" id="apply-histogram-based-segmentation-button">Apply</button>
+                </div>
+            </div>
+        
+            <div class="operation-tab-content" id="image-operations-tab">
+                <div class="block operation-block" id="single-image-operations-block">
+                    <div class="block-header operation-block-header">Single Image Operations</div>
+                    <div class="operation-settings">
+                        <div class="settings operation-main-settings">
+                            <label for="single-image-operation-input">Operation:</label>
+                            <select id="single-image-operation-input" data-extra-setting="single-image-operation">
+                                <option value="" selected>-</option>
+                                <option value="rotate">Rotate</option>
+                                <option value="flip">Flip</option>
+                                <option value="resize">Resize</option>
+                                <option value="invert">Invert</option>
+                            </select>
+                        </div>
+        
+                        <div class="operation-extra-settings">
+                            <div class="settings extra-setting" data-extra-setting="single-image-operation" data-extra-value="rotate">
+                                <label for="single-image-rotate-angle-input">Rotation Angle:</label>
+                                <input type="number" id="single-image-rotate-angle-input" step="0.1">
+                            </div>
+        
+                            <div class="settings extra-setting" data-extra-setting="single-image-operation" data-extra-value="flip">
+                                <label for="single-image-flip-mode-input">Flip Mode:</label>
+                                <select id="single-image-flip-mode-input">
+                                    <option value="horizontal">Horizontal</option>
+                                    <option value="vertical">Vertical</option>
+                                </select>
+                            </div>
+        
+                            <div class="settings extra-setting" data-extra-setting="single-image-operation" data-extra-value="resize">
+                                <label for="single-image-resize-width-input">Width:</label>
+                                <input type="number" id="single-image-resize-width-input">
+        
+                                <label for="single-image-resize-height-input">Height:</label>
+                                <input type="number" id="single-image-resize-height-input">
+                            </div>
+        
+                            <div class="settings extra-setting" data-extra-setting="single-image-operation" data-extra-value="invert">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="operation-message" id="single-image-operation-message"></div>
+                    <button class="apply-operation-button" id="apply-single-image-operation-button">Apply</button>
+                </div>
+                <div class="block operation-block" id="multiple-image-operations-block">
+                    <div class="block-header operation-block-header">Multiple Image Operations</div>
+                    <div class="operation-settings">
+                        <div class="settings operation-main-settings">
+                            <label for="multiple-image-operation-input">Operation:</label>
+                            <select id="multiple-image-operation-input" data-extra-setting="multiple-image-operation">
+                                <option value="" selected>-</option>
+                                <option value="add">Add</option>
+                                <option value="subtract">Subtract</option>
+                                <option value="cut_and_paste">Cut and Paste</option>
+                            </select>
+                        </div>
+        
+                        <div class="operation-extra-settings">
+                            <div class="settings extra-setting" data-extra-setting="multiple-image-operation" data-extra-value="add">
+                                <label for="browse-images-add">Choose Images:</label>
+                                <button id="browse-images-add">Browse</button>
+                            </div>
+        
+                            <div class="settings extra-setting" data-extra-setting="multiple-image-operation" data-extra-value="subtract">
+                                <label for="browse-images-subtract">Choose Images:</label>
+                                <button id="browse-images-subtract">Browse</button>
+                            </div>
+        
+                            <div class="settings extra-setting" data-extra-setting="multiple-image-operation" data-extra-value="cut_and_paste">
+                                <label for="browse-images-cut-and-paste">Choose Images:</label>
+                                <button id="browse-images-cut-and-paste">Browse</button>
+                                <label for="multiple-image-operations-src-region-input">Source Region (x1,y1,x2,y2):</label>
+                                <input type="text" id="multiple-image-operations-src-region-input" placeholder="e.g., 10,20,100,200">
+                                
+                                <label for="multiple-image-operations-dest-region-input">Destination Position (x,y):</label>
+                                <input type="text" id="multiple-image-operations-dest-region-input" placeholder="e.g., 150,250">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="operation-message" id="multiple-image-operation-message"></div>
+                    <button class="apply-operation-button" id="apply-multiple-image-operation-button">Apply</button>
+                </div>
+            </div>
+        
+            <!-- Operation History Tab -->
+            <div class="operation-tab-content" id="operation-history-tab">
+                <div class="block" id="operation-history-block">
+                    <pre id="operation-history-content"></pre>
+                </div>
+            </div>
+        
+            <!-- Default Operations Tab -->
+            <div class="operation-tab-content" id="default-operations-tab">
+                <p>Select an operation to begin.</p>
+            </div>
+        </div>               
     </div>
-  </div>
-  <!-- Placeholder for operations -->
-  <div id="operations">
-    <!-- Future implementation -->
-  </div>
-  <script src="script.js"></script>
+    <script src="script.js"></script>
 </body>
 </html>
+
+
+<!-- <div class="operation-tab-description" id="halftoning-description"></div>
+            <div class="operation-tab-description" id="histogram-description"></div>
+            <div class="operation-tab-description" id="edge-detection-description"></div>
+            <div class="operation-tab-description" id="filter-description"></div>
+            <div class="operation-tab-description" id="segmentation-description"></div>
+            <div class="operation-tab-description" id="image-operations-description"></div> -->

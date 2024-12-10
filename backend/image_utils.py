@@ -1,9 +1,7 @@
-from PIL import Image, ExifTags
+from PIL import Image, ExifTags, ImageDraw
 import io
-import heapq
-import matplotlib
-matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 import numpy as np
 from numpy.lib.stride_tricks import sliding_window_view
 import cv2
@@ -58,72 +56,108 @@ def get_metadata(image_bytes: bytes, filename: str) -> dict:
         return {"error": str(e)}
 
 def calculate_histogram(image_array: np.ndarray) -> Any:
-    if image_array.ndim == 2:  # Grayscale image
-        histogram = np.zeros(256, dtype=int)
-        for value in range(256):
-            histogram[value] = np.sum(image_array == value)
+    if image_array.ndim == 2:  # grayscale image
+        histogram = np.bincount(image_array.flatten(), minlength=256)
         return histogram
     elif image_array.ndim == 3 and image_array.shape[2] == 3:  # RGB image
         histograms = {}
         color_channels = ('red', 'green', 'blue')
         for i, color in enumerate(color_channels):
-            channel_histogram = np.zeros(256, dtype=int)
-            for value in range(256):
-                channel_histogram[value] = np.sum(image_array[:, :, i] == value)
-            histograms[color] = channel_histogram
+            channel = image_array[:, :, i].flatten()
+            histograms[color] = np.bincount(channel, minlength=256)
         return histograms
     else:
         raise ValueError("Input image must be either a 2D grayscale or 3D RGB image array.")
+
+# def create_histogram_image(histograms: Any, image_mode: str) -> io.BytesIO:
+#     if image_mode == 'L':  # greyscale
+#         fig, ax = plt.subplots(figsize=(10, 2))
+#         ax.bar(range(256), histograms, color='gray')
+#         ax.set_title('Grayscale Histogram')
+#         ax.set_xlabel('Pixel Intensity')
+#         ax.set_ylabel('Frequency')
+#         plt.tight_layout()
+#     elif image_mode == 'RGB':
+#         fig, axes = plt.subplots(3, 1, figsize=(10, 6))
+#         color_channels = ('Red', 'Green', 'Blue')
+#         colors = ('red', 'green', 'blue')
+#         for i, (ax, color, channel_name) in enumerate(zip(axes, colors, color_channels)):
+#             ax.bar(range(256), histograms[color], color=color)
+#             ax.set_title(f'{channel_name} Channel Histogram')
+#             ax.set_xlabel('Pixel Intensity')
+#             ax.set_ylabel('Frequency')
+#             plt.tight_layout()
+#     else:
+#         return {"error": "Unsupported image mode for histogram generation."}
+    
+#     canvas = FigureCanvas(fig)
+
+#     buf = io.BytesIO()
+#     canvas.print_png(buf)
+#     plt.close(fig)
+#     buf.seek(0)
+#     return buf
+
+def create_histogram_image(histograms: Any, image_mode: str) -> io.BytesIO:
+    if image_mode == 'L':
+        width = 256
+        height = 100
+        hist_image = Image.new('RGB', (width, height), 'white')
+        draw = ImageDraw.Draw(hist_image)
+        max_freq = max(histograms)
+        for x in range(256):
+            y = histograms[x]
+            draw.line([(x, height), (x, height - int((y / max_freq) * height))], fill='gray')
+    elif image_mode == 'RGB':
+        width = 256
+        height = 300
+        hist_image = Image.new('RGB', (width, height), 'white')
+        draw = ImageDraw.Draw(hist_image)
+        color_channels = ('red', 'green', 'blue')
+        colors = ('red', 'green', 'blue')
+        max_freq = max([max(histograms[color]) for color in colors])
+        for i, color in enumerate(colors):
+            for x in range(256):
+                y = histograms[color][x]
+                draw.line([(x, height - i*100), (x, height - i*100 - int((y / max_freq) * 100))], fill=color)
+    else:
+        return {"error": "Unsupported image mode for histogram generation."}
+    
+    buf = io.BytesIO()
+    hist_image.save(buf, format='PNG')
+    buf.seek(0)
+    return buf
 
 def get_histograms(image_bytes: bytes):
     try:
         image = Image.open(io.BytesIO(image_bytes))
         
-        if image.mode in ('L', 'RGB'):
-            image_converted = image
-        elif image.mode in ('I', 'F'):
-            image = image.point(lambda x: x * (255 / (image.getextrema()[1] or 1)))
-            image = image.convert('L')
-        else:
-            image_converted = image.convert('RGB')
-
-        image_array = np.array(image_converted)
+        if image.mode not in ('L', 'RGB'):
+            if image.mode in ('I', 'F'):
+                # Normalize and convert to grayscale
+                image = image.point(lambda x: x * (255 / (image.getextrema()[1] or 1)))
+                image = image.convert('L')
+            else:
+                # Convert to RGB
+                image = image.convert('RGB')
+        
+        image_array = np.array(image)
         histograms = calculate_histogram(image_array)
-
-        buf = io.BytesIO()
-
-        if image_array.ndim == 2:
-            plt.figure(figsize=(10, 2))
-            plt.bar(range(256), histograms, color='gray')
-            plt.title('Grayscale Histogram')
-            plt.xlabel('Pixel Intensity')
-            plt.ylabel('Frequency')
-            plt.tight_layout()
-        elif image_array.ndim == 3 and image_array.shape[2] == 3:
-            color_channels = ('Red', 'Green', 'Blue')
-            colors = ('red', 'green', 'blue')
-
-            plt.figure(figsize=(10, 6))
-            for i, (color, channel_name) in enumerate(zip(colors, color_channels)):
-                plt.subplot(3, 1, i + 1)
-                plt.bar(range(256), histograms[color], color=color)
-                plt.title(f'{channel_name} Channel Histogram')
-                plt.xlabel('Pixel Intensity')
-                plt.ylabel('Frequency')
-                plt.tight_layout()
+        
+        if image.mode == 'L':
+            image_mode = 'L'
+        elif image.mode == 'RGB':
+            image_mode = 'RGB'
         else:
-            return {"error": "Unsupported image format for histogram generation."}
+            return {"error": "Unsupported image mode for histogram generation."}
 
-        plt.savefig(buf, format='png')
-        plt.close()
-        buf.seek(0)
-
-        return buf
+        histogram_image = create_histogram_image(histograms, image_mode)
+        return histogram_image
 
     except Exception as e:
         return {"error": str(e)}
 
-def to_png_bytes(image_bytes: bytes) -> Any: # for storing images
+def to_png_bytes(image_bytes: bytes) -> Any: 
     try:
         image = Image.open(io.BytesIO(image_bytes))
         buf = io.BytesIO()
@@ -176,7 +210,7 @@ def apply_halftoning(image_bytes: bytes, operation: HalftoningOperation) -> Any:
                 return {"error": f"Unsupported halftoning method '{method}' for mode 'grayscale'."}
             
             halftoned_image = Image.fromarray(np.uint8(halftoned_image_array), mode='L')
-        elif mode == 'RGB':
+        elif mode == 'rgb':
             image = image.convert('RGB')
             if method == 'thresholding':
                 halftoned_image_array = halftone_rgb_thresholding(image, threshold)
@@ -291,7 +325,7 @@ def apply_histogram_smoothing(image_bytes: bytes, operation: HistogramSmoothingO
             smoothed_image_array = map_hist_to_image(image_array, smoothed_histogram)
 
             smoothed_image = Image.fromarray(np.uint8(smoothed_image_array), mode='L')
-        elif operation.mode == 'RGB':
+        elif operation.mode == 'rgb':
             image = image.convert('RGB')
             image_array = np.array(image)
 
@@ -357,7 +391,7 @@ def apply_histogram_equalization(image_bytes: bytes, operation: HistogramEqualiz
             image_array = np.array(image)
             equalized_image_array = equalize_channel(image_array)
             equalized_image = Image.fromarray(np.uint8(equalized_image_array), mode='L')
-        elif operation.mode == 'RGB':
+        elif operation.mode == 'rgb':
             # convert to YCbCr color space for luminance handling
             image = image.convert('YCbCr')
             image_array = np.array(image)
@@ -900,10 +934,10 @@ def flip_image(image_array: np.ndarray, mode: str) -> np.ndarray:
 def invert_image(image_array: np.ndarray) -> np.ndarray:
     return 255 - image_array
 
-def apply_multi_image_operation(image_bytes_list: List[bytes], operation: MultiImageOperation) -> Any:
+def apply_multi_image_operation(operation: MultiImageOperation) -> Any:
     try:
         image_arrays = []
-        for idx, img_bytes in enumerate(image_bytes_list):
+        for idx, img_bytes in enumerate(operation.images):
             try:
                 img = Image.open(io.BytesIO(img_bytes)).convert('RGB')
                 img_array = np.array(img)
@@ -1003,7 +1037,7 @@ def create_image(operation: CreateImageOperation) -> Any:
     except Exception as e:
         return {"error": str(e)}
     
-def apply_histogram_segmentation(image_bytes: bytes, operation) -> Any:
+def apply_histogram_based_segmentation(image_bytes: bytes, operation: HistogramSegmentationOperation) -> Any:
     try:
         image = Image.open(io.BytesIO(image_bytes)).convert('L')
         image_array = np.array(image)
@@ -1118,7 +1152,6 @@ def find_peaks(histogram, num_peaks=5):
     sorted_peaks = sorted(peak_persistence, key=lambda x: x['persistence'], reverse=True)
     top_peaks = [peak['index'] for peak in sorted_peaks[:num_peaks]]
     return top_peaks
-
 
 def peaks_high_low(histogram, peak1, peak2):
     if peak1 > peak2:

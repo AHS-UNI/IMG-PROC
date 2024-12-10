@@ -1,0 +1,405 @@
+@import url("https://cdn.jsdelivr.net/gh/vsalvino/computer-modern@main/fonts/serif.css");
+  
+body {
+    font-family: "Computer Modern Serif", serif;
+}
+
+button {
+    font-family: "Computer Modern Serif", serif;
+    cursor: pointer;
+}
+
+select {
+    font-family: "Computer Modern Serif", serif;
+}
+
+input[type="file"]::file-selector-button {
+    font-family: "Computer Modern Serif", serif;
+}
+
+.container {
+    border: solid black 3px;
+    margin-left: 10px;
+    margin-right: 10px;
+    padding-left: 10px;
+    padding-right: 10px;
+    padding-bottom: 10px;
+}
+
+.block {
+    border: solid black 1px;
+    overflow: auto;
+    padding-left: 10px;
+    padding-right: 10px;
+    padding-bottom: 10px;
+    padding-top: 10px;
+}
+
+.container-header {
+    font-size: 30px;
+    margin-top: 10px;
+    margin-bottom: 10px;
+}
+
+.block-header {
+    font-size: 20px;
+    margin-top: 0px;
+    margin-bottom: 10px;
+}
+
+.footnote {
+    font-size: 15px;
+    margin-bottom: 15px;
+}
+
+.thumbnail {
+    width: 150px;
+    height: 150px;
+    object-fit: cover;
+    transition: transform 0.3s;
+    cursor: pointer;
+    border: 1px solid grey;
+}
+
+.thumbnail.selected {
+    filter: grayscale(100%);
+    opacity: 0.6;
+}
+
+.thumbnail img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    cursor: pointer;
+}
+
+.thumbnail:hover {
+    cursor: pointer;
+    transform: scale(1.05);
+}
+
+.settings {
+    display: grid;
+    grid-template-columns: max-content max-content;
+    grid-auto-rows: max-content;
+    gap: 5px;
+}
+
+.settings label { text-align:right; }
+
+.operation-tab-link {
+    font-size: 17px;
+}
+
+.operation-tab-link:disabled {
+    background-color: #AAAA;
+    color: #666;
+}
+
+.operation-tab-content {
+    grid-auto-rows: auto;
+    gap: 10px;
+}
+
+.operation-block {
+    display: grid;
+    grid-template-areas: 
+    "header header header"
+    "settings .  ."
+    "message . apply";
+    gap: 10px;
+    grid-template-columns: auto 1fr 150px;
+    grid-template-rows: repeat(2, auto) 22px;  
+}
+
+.operation-block-header {
+    grid-area: header;
+}
+
+.operation-settings {
+    grid-area: settings;
+    
+    display: grid;
+    grid-template-areas: 
+    "main-settings extra-settings";
+    gap: 10px;
+}
+
+.operation-main-settings {
+    grid-area: main-settings;
+}
+
+.operation-extra-settings {
+    grid-area: extra-settings;
+
+    display: grid;
+    grid-template-columns: auto;
+    grid-auto-rows: max-content;
+    gap: 5px;
+}
+
+.operation-message {
+    grid-area: message;
+}
+
+.apply-operation-button {
+    grid-area: apply;
+}
+
+.apply-operation-button:disabled {
+    grid-area: apply;
+    background-color: #AAAA;
+    color: #666;
+}
+
+#main-container {
+    display: grid;
+    gap: 15px;
+    grid-template-rows: repeat(3, auto);
+
+    width: fit-content;
+    margin: 10px;
+    padding: 10px;
+}
+
+#title {
+    font-size: 45px;
+}
+
+#image-management-container {
+    display: grid;
+
+    grid-template-columns: 300px 300px 1fr;
+    grid-template-rows: repeat(4, auto);
+    gap: 10px;
+    grid-template-areas: 
+    "header header header"
+    "upload create images"
+    ".      create images"
+    ".      .      images";
+
+    box-sizing: border-box; 
+}
+
+#image-management-container-header {
+    grid-area: header;
+}
+
+#upload-image-block {
+    grid-area: upload;
+
+    display: grid;
+    grid-template-rows: repeat(2, auto) 22px;
+    gap: 10px;
+    grid-template-areas: 
+    "header"
+    "browse"
+    "upload";
+
+    box-sizing: border-box;
+    width: 300px;
+}
+
+#upload-image-file-input {
+    font-family: "Computer Modern Serif", serif;
+}
+
+#create-image-block {
+    grid-area: create;
+
+    display: grid;
+    grid-template-rows: repeat(2, auto) 22px;
+    gap: 10px;
+    grid-template-areas: 
+    "header"
+    "settings"
+    "button";
+
+    box-sizing: border-box;
+    width: 300px;
+}
+
+#create-image-block-header {
+    grid-area: header;
+}
+
+#create-image-settings {
+    grid-area: settings;
+}
+
+#create-image-button {
+    grid-area: button;
+}
+
+#images-block {
+    grid-area: images;
+
+    display: grid;
+    grid-template-rows: auto auto 22px;
+    grid-template-columns: 278px auto auto;
+    gap: 10px;
+    grid-template-areas: 
+    "header header"
+    "images-grid images-grid"
+    "settings .";
+
+    box-sizing: border-box;
+}
+
+#images-block-header {
+    grid-area: header;
+}
+
+#image-list {
+    grid-area: images-grid;
+    display: flex; 
+    flex-direction: row; 
+    flex-wrap: nowrap; 
+    gap: 10px;
+    overflow-x: auto; 
+    overflow-y: hidden;
+    padding-bottom: 10px;
+    position: relative;
+}
+
+#images-settings {
+    grid-area: settings;
+
+    display: grid;
+    gap: 10px;
+    grid-template-columns: 1fr 1fr;
+}
+
+#workspace-grid-container {
+    display: grid;
+    grid-template-areas:
+    "header header"
+    "column-1 column-2";
+    grid-template-columns: 1fr 30%;
+    grid-template-rows: repeat(2, auto);
+    gap: 10px;
+}
+
+#workspace-grid-container-header {
+    grid-area: header;
+}
+
+#workspace-column-1 {
+    grid-area: column-1;
+
+    display: grid;
+    grid-template-areas: 
+    "workspace"
+    ".";
+    grid-template-rows: auto 1fr;
+
+}
+
+#workspace-block {
+    grid-area: workspace;
+
+    display: grid;
+    grid-template-areas: 
+    "image image"
+    "coords .";
+    gap: 10px;
+    grid-template-columns: repeat(2, auto);
+    grid-template-rows: repeat(2, auto);
+
+}
+
+#workspace-image {
+    grid-area: image;
+
+    width: 100%;
+    object-fit: contain;
+    cursor: crosshair;
+}
+
+#workspace-coord-display {
+    grid-area: coords;
+
+    font-size: 16px;
+}
+
+#workspace-column-2 {
+    grid-area: column-2;
+
+    display: grid;
+    grid-template-areas: 
+    "histogram"
+    "metadata"
+    "settings"
+    ".";
+    gap: 10px;
+    grid-template-rows: repeat(2, auto) 22px 1fr;
+}
+
+#histogram-block {
+    grid-area: histogram;
+
+    display: grid;
+    grid-template-areas: 
+    "header header"
+    "image image"
+    "coord .";
+    gap: 10px;
+    grid-template-columns: repeat(2, auto);
+    grid-template-rows: repeat(3, auto);
+}
+
+#histogram-block-header {
+    grid-area: header;
+}
+
+#histogram-image {
+    grid-area: image;
+
+    width: 100%;
+    object-fit: contain;
+    cursor: crosshair;
+}
+
+#histogram-x-coord-display {
+    grid-area: coord;
+
+    font-size: 16px;
+}
+
+#metadata-block {
+    grid-area: metadata;
+    background-color: #f9f9f9;
+}
+
+#metadata-content {
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    font-family: monospace;
+}
+
+#workspace-settings {
+    grid-area: settings;
+
+    display: grid;
+    gap: 10px;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 22px;
+}
+
+#operation-tabs {
+    display: grid;
+    grid-template-columns: repeat(7, auto) 1fr auto;
+    gap: 5px;
+
+    padding-bottom: 10px;
+}
+
+#operation-history-tab-link {
+    grid-column: 9;
+}
+
+
+
+
+

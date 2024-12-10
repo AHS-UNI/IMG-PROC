@@ -1,11 +1,11 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException, Body
-from fastapi.responses import StreamingResponse, FileResponse
+from fastapi import FastAPI, UploadFile, File, HTTPException, Body, Form
+from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
-from uuid import uuid4
-import os
-import shutil
-import image_utils  # Assume this module contains implementations for all operations
+import io
+import json
+import image_utils 
 from operations import (
+    ImageOperation,
     GrayscaleOperation,
     HalftoningOperation,
     HistogramEqualizationOperation,
@@ -18,369 +18,243 @@ from operations import (
     CreateImageOperation,
     HistogramSegmentationOperation
 )
-from responses import ImageResponse
+from typing import Dict, List
 
 app = FastAPI(
-    title="Image Processing API",
-    description="An API for uploading images, applying transformations, and retrieving results. Developed as a project for Image Processing IT441 course at Helwan University. Developed by AHS",
-    version="1.0.0"
+    title="IMG-PROC",
+    description="A stateless image processing API. Developed by AHS",
+    version="2.0.0"
 )
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["http://localhost:8080", "http://0.0.0.0:8080/"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-BASE_DIR = os.getcwd()
-IMAGE_DIR = os.path.join(BASE_DIR, "images")
-HISTOGRAM_DIR = os.path.join(BASE_DIR, "histograms")
-
-for directory in [IMAGE_DIR, HISTOGRAM_DIR]:
-    os.makedirs(directory, exist_ok=True)
-
-@app.post("/images/", response_model=ImageResponse, status_code=201)
-async def upload_image(file: UploadFile = File(...)):
+@app.post("/to_png")
+async def to_png(file: UploadFile = File(...)):
     """
-    Upload a new image.
+    Converts images to PNG format.
 
-    - **file**: Image file to upload.
-    - **Returns**: Image ID, metadata, and histogram ID.
+    - **file**: Image file.
+    - **Returns**: Image as PNG.
     """
-    image_id = str(uuid4())
-    image_filename = f"{image_id}.png"
-    image_path = os.path.join(IMAGE_DIR, image_filename)
-    histogram_path = os.path.join(HISTOGRAM_DIR, f"{image_id}.png")
-
+    
     image_bytes = await file.read()
-
-    png_image_bytes = image_utils.to_png_bytes(image_bytes)
-    if isinstance(png_image_bytes, dict) and "error" in png_image_bytes:
-        raise HTTPException(status_code=400, detail=png_image_bytes["error"])
-    
-    with open(image_path, "wb") as f:
-        f.write(png_image_bytes.getvalue())
-    
-    metadata = image_utils.get_metadata(image_bytes, file.filename)
-    if "error" in metadata:
-        raise HTTPException(status_code=400, detail=metadata["error"])
-    metadata['transformed'] = False # transformed flag
-
-    histogram = image_utils.get_histograms(png_image_bytes.getvalue())
-    if isinstance(histogram, dict) and "error" in histogram:
-        raise HTTPException(status_code=400, detail=histogram["error"])
-    
-    with open(histogram_path, "wb") as f:
-        f.write(histogram.getvalue())
-
-    return ImageResponse(
-        image_id = image_id,
-        metadata = metadata,
-        histogram_id = image_id
-    )
-
-@app.post("/images/create", response_model=ImageResponse, status_code=201)
-def create_image(operation: CreateImageOperation):
-    """
-    Creates a new image with the specified size and color.
-    
-    - **width**: Width of the image in pixels.
-    - **height**: Height of the image in pixels.
-    - **color**: Background color ('white' or 'black').
-    
-    - **Returns**: Image ID, metadata, and histogram ID.
-    """
-    result = image_utils.create_image(operation)
+    result = image_utils.to_png_bytes(image_bytes)
     if isinstance(result, dict) and "error" in result:
         raise HTTPException(status_code=400, detail=result["error"])
     
-    image_id = str(uuid4())
-    image_filename = f"{image_id}.png"
-    image_path = os.path.join(IMAGE_DIR, image_filename)
-    histogram_path = os.path.join(HISTOGRAM_DIR, f"{image_id}.png")
+    image_bytes = result.getvalue()
 
-    with open(image_path, "wb") as f:
-        f.write(result.getvalue())
+    return StreamingResponse(io.BytesIO(image_bytes), media_type="image/png")
 
+@app.post("/create_image")
+async def create_image(operation_data: CreateImageOperation):
+    """
+    Creates a new image with the specified size and color.
+
+    - **operation_data**: Parameters for creating the image.
+    - **Returns**: Created image as PNG.
+    """
+
+    result = image_utils.create_image(operation_data)
+    if isinstance(result, dict) and "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
     
     image_bytes = result.getvalue()
-    metadata = image_utils.get_metadata(image_bytes, image_filename)
-    if "error" in metadata:
-        raise HTTPException(status_code=400, detail=metadata["error"])
-    metadata['transformed'] = False
 
+    return StreamingResponse(io.BytesIO(image_bytes), media_type="image/png")
+
+@app.post("/histogram")
+async def get_histogram(file: UploadFile = File(...)):
+    """
+    Computes and returns the histogram of the provided image.
+
+    - **file**: Image file to analyze.
+    - **Returns**: Histogram image as PNG.
+    """
+    image_bytes = await file.read()
     histogram = image_utils.get_histograms(image_bytes)
     if isinstance(histogram, dict) and "error" in histogram:
         raise HTTPException(status_code=400, detail=histogram["error"])
     
-    with open(histogram_path, "wb") as f:
-        f.write(histogram.getvalue())
+    return StreamingResponse(io.BytesIO(histogram.getvalue()), media_type="image/png")
 
-    return ImageResponse(
-        image_id = image_id,
-        metadata = metadata,
-        histogram_id = image_id
-    )
+@app.post("/metadata")
+async def get_metadata(file: UploadFile = File(...)):
+    """
+    Retrieves metadata of the provided image.
+
+    - **file**: Image file to extract metadata from.
+    - **Returns**: Image metadata.
+    """
+    image_bytes = await file.read()
+    metadata = image_utils.get_metadata(image_bytes, file.filename)
+    if "error" in metadata:
+        raise HTTPException(status_code=400, detail=metadata["error"])
     
-@app.get("/images/{image_id}", response_class=StreamingResponse)
-def get_image(image_id: str):
+    return metadata
+
+@app.post("/transform")
+async def transform_image(file: UploadFile = File(...), operation_data: str = Form(...)):
     """
-    Retrieve an uploaded image.
+    Applies a transformation to the provided image.
 
-    - **image_id**: ID of the image to retrieve.
-    - **Returns**: Image file as PNG.
+    - **file**: Image file to transform.
+    - **operation_data**: Operation parameters including 'operation_type'.
+    - **Returns**: Transformed image as PNG.
     """
-    image_path = get_image_path(image_id)
-    if not os.path.exists(image_path):
-        raise HTTPException(status_code=404, detail="Image not found")
-    return FileResponse(image_path, media_type="image/png")
+    try:
+        operation_dict = json.loads(operation_data)
+    except json.JSONDecodeError as e:
+        raise HTTPException(status_code=400, detail=f"Invalid JSON for operation_data: {str(e)}")
+    
+    image_bytes = await file.read()
+    operation_type = operation_dict.get('operation_type')
+    if not operation_type:
+        raise HTTPException(status_code=400, detail="operation_type is required.")
+    
+    operation = parse_operation(operation_dict)
+    transformed_image = await apply_transformation(image_bytes, operation, operation_type)
+    return StreamingResponse(io.BytesIO(transformed_image), media_type="image/png")
 
-
-@app.get("/images/{image_id}/histogram", response_class=FileResponse)
-def get_histogram(image_id: str):
+@app.post("/tranform_multi")
+async def transform_multi_image(files: List[UploadFile] = File(...), operation_data: str = Form(...)):
     """
-    Retrieve the histogram of an image.
+    Applies a transformation that involves multiple images.
 
-    - **image_id**: ID of the image.
-    - **Returns**: Histogram image as PNG.
+    - **files**: List of image files to transform.
+    - **operation_data**: Operation parameters including 'operation_type'.
+    - **Returns**: Transformed image as PNG.
     """
-    histogram_path = os.path.join(HISTOGRAM_DIR, f"{image_id}.png")
-    if not os.path.exists(histogram_path):
-        raise HTTPException(status_code=404, detail="Histogram not found")
-    return FileResponse(histogram_path, media_type="image/png")
-
-@app.delete("/images/{image_id}", status_code=204)
-def delete_image(image_id: str):
-    """
-    Delete an uploaded image.
-
-    - **image_id**: ID of the image to delete.
-    """
-    image_path = get_image_path(image_id)
-    if os.path.exists(image_path):
-        os.remove(image_path)
-        histogram_path = os.path.join(HISTOGRAM_DIR, f"{image_id}.png")
-        if os.path.exists(histogram_path):
-            os.remove(histogram_path)
-    else:
-        raise HTTPException(status_code=404, detail="Image not found")
-    return
-
-@app.post("/images/{image_id}/grayscale", response_model=ImageResponse, status_code=201)
-async def apply_grayscale(image_id: str, operation: GrayscaleOperation = Body(...)):
-    """
-    Apply grayscale transformation.
-
-    - **image_id**: ID of the image to transform.
-    - **operation**: Grayscale operation parameters.
-    - **Returns**: Transformed image ID, metadata, and histogram ID.
-
-    """
-    return await apply_transformation(image_id, operation, 'grayscale')
-
-@app.post("/images/{image_id}/halftoning", response_model=ImageResponse, status_code=201)
-async def apply_halftoning(image_id: str, operation: HalftoningOperation = Body(...)):
-    """
-    Apply halftoning transformation.
-
-    - **image_id**: ID of the image to transform.
-    - **operation**: Halftoning operation parameters.
-    - **Returns**: Transformed image ID, metadata, and histogram ID.
-
-    """
-    return await apply_transformation(image_id, operation, 'halftoning')
-
-@app.post("/images/{image_id}/histogram_equalization", response_model=ImageResponse, status_code=201)
-async def apply_equalization(image_id: str, operation: HistogramEqualizationOperation = Body(...)):
-    """
-    Apply histogram equalization.
-
-    - **image_id**: ID of the image to transform.
-    - **operation**: Equalization operation parameters.
-    - **Returns**: Transformed image ID, metadata, and histogram ID.
-
-    """
-    return await apply_transformation(image_id, operation, 'histogram_equalization')
-
-@app.post("/images/{image_id}/histogram_smoothing", response_model=ImageResponse, status_code=201)
-async def apply_equalization(image_id: str, operation: HistogramSmoothingOperation = Body(...)):
-    """
-    Apply histogram smoothing.
-
-    - **image_id**: ID of the image to transform.
-    - **operation**: Smoothinh operation parameters.
-    - **Returns**: Transformed image ID, metadata, and histogram ID.
-
-    """
-    return await apply_transformation(image_id, operation, 'histogram_smoothing')
-
-@app.post("/images/{image_id}/basic_edge_detection", response_model=ImageResponse, status_code=201)
-async def apply_basic_edge_detection(image_id: str, operation: BasicEdgeDetectionOperation = Body(...)):
-    """
-    Apply basic edge detection.
-
-    - **image_id**: ID of the image to transform.
-    - **operation**: Basic edge detection parameters.
-    - **Returns**: Transformed image ID, metadata, and histogram ID.
-
-    """
-    return await apply_transformation(image_id, operation, 'basic_edge_detection')
-
-@app.post("/images/{image_id}/advanced_edge_detection", response_model=ImageResponse, status_code=201)
-async def apply_advanced_edge_detection(image_id: str, operation: AdvancedEdgeDetectionOperation = Body(...)):
-    """
-    Apply advanced edge detection.
-
-    - **image_id**: ID of the image to transform.
-    - **operation**: Advanced edge detection parameters.
-    - **Returns**: Transformed image ID, metadata, and histogram ID.
-
-    """
-    return await apply_transformation(image_id, operation, 'advanced_edge_detection')
-
-@app.post("/images/{image_id}/filtering", response_model=ImageResponse, status_code=201)
-async def apply_filtering(image_id: str, operation: FilteringOperation = Body(...)):
-    """
-    Apply filtering operation.
-
-    - **image_id**: ID of the image to transform.
-    - **operation**: Filtering operation parameters.
-    - **Returns**: Transformed image ID, metadata, and histogram ID.
-
-    """
-    return await apply_transformation(image_id, operation, 'filtering')
-
-@app.post("/images/{image_id}/single_operation", response_model=ImageResponse, status_code=201)
-async def apply_single_image_operation(image_id: str, operation: SingleImageOperation = Body(...)):
-    """
-    Apply single image operation (rotate, flip, scale, invert).
-
-    - **image_id**: ID of the image to transform.
-    - **operation**: Single image operation parameters.
-    - **Returns**: Transformed image ID, metadata, and histogram ID.
-
-    """
-    return await apply_transformation(image_id, operation, 'single_operation')
-
-@app.post("/images/multi_operation", response_model=ImageResponse, status_code=201)
-async def apply_multi_image_operation(operation: MultiImageOperation = Body(...)):
-    """
-    Apply multi-image operation (add, subtract, cut_paste).
-
-    - **operation**: Multi-image operation parameters.
-    - **Returns**: Transformed image ID, metadata, and histogram ID.
-
-    """
-    return await apply_multi_transformation(operation)
-
-def get_image_path(image_id: str):
-    image_file_name = f"{image_id}.png"
-    image_path = os.path.join(IMAGE_DIR, image_file_name)
-    if not os.path.exists(image_path):
-        raise HTTPException(status_code=404, detail="Image not found")
-    return image_path
-
-@app.post("/images/{image_id}/histogram_segmentation", status_code=201)
-async def apply_histogram_segmentation(image_id: str, operation: HistogramSegmentationOperation = Body(...)):
-    """
-    Apply histogram-based segmentation.
-
-    - **image_id**: ID of the image to transform.
-    - **operation**: Segmentation operation parameters.
-    - **Returns**: Transformed image.
-    """
-    return await apply_transformation(image_id, operation, 'histogram_segmentation')
-
-async def apply_transformation(image_id: str, operation, operation_type: str):
-    image_path = get_image_path(image_id)
-
-    with open(image_path, "rb") as f:
-        image_bytes = f.read()
-
-    if operation_type == 'grayscale':
-        result = image_utils.apply_grayscale(image_bytes, operation)
-    elif operation_type == 'halftoning':
-        result = image_utils.apply_halftoning(image_bytes, operation)
-    elif operation_type == 'histogram_equalization':
-        result = image_utils.apply_histogram_equalization(image_bytes, operation)
-    elif operation_type == 'histogram_smoothing':
-        result = image_utils.apply_histogram_smoothing(image_bytes, operation)
-    elif operation_type == 'basic_edge_detection':
-        result = image_utils.apply_basic_edge_detection(image_bytes, operation)
-    elif operation_type == 'advanced_edge_detection':
-        result = image_utils.apply_advanced_edge_detection(image_bytes, operation)
-    elif operation_type == 'filtering':
-        result = image_utils.apply_filtering(image_bytes, operation)
-    elif operation_type == 'single_operation':
-        result = image_utils.apply_single_image_operation(image_bytes, operation)
-    elif operation_type == 'histogram_segmentation':
-        result = image_utils.apply_histogram_segmentation(image_bytes, operation)
-    else:
-        raise HTTPException(status_code=400, detail="Unsupported operation type")
-
-    if isinstance(result, dict) and "error" in result:
-        raise HTTPException(status_code=400, detail=result["error"])
-
-    transformed_image_id = str(uuid4())
-    transformed_image_filename = f"{transformed_image_id}.png"
-    transformed_image_path = os.path.join(IMAGE_DIR, transformed_image_filename)
-    with open(transformed_image_path, "wb") as f:
-        f.write(result.getvalue())
-
-    transformed_image_bytes = result.getvalue()
-    metadata = image_utils.get_metadata(transformed_image_bytes, transformed_image_filename)
-    if "error" in metadata:
-        raise HTTPException(status_code=400, detail=metadata["error"])
-    metadata['transformed'] = True
-
-    histogram = image_utils.get_histograms(transformed_image_bytes)
-    if isinstance(histogram, dict) and "error" in histogram:
-        raise HTTPException(status_code=400, detail=histogram["error"])
-    histogram_path = os.path.join(HISTOGRAM_DIR, f"{transformed_image_id}.png")
-    with open(histogram_path, "wb") as f:
-        f.write(histogram.getvalue())
-
-    return ImageResponse(
-        image_id = transformed_image_id,
-        metadata = metadata,
-        histogram_id = transformed_image_id
-    )
-
-async def apply_multi_transformation(operation: MultiImageOperation):
+    if len(files) < 2:
+        raise HTTPException(status_code=400, detail="At least two image files must be provided.")
+    
+    try:
+        operation_dict = json.loads(operation_data)
+    except json.JSONDecodeError as e:
+        raise HTTPException(status_code=400, detail=f"Invalid JSON for operation_data: {str(e)}")
+    
+    operation_type = operation_dict.get('operation_type')
+    if not operation_type:
+        raise HTTPException(status_code=400, detail="operation_type is required.")
+    
     image_bytes_list = []
-    for image_id in operation.images:
-        image_path = get_image_path(image_id)
-        with open(image_path, "rb") as f:
-            image_bytes_list.append(f.read())
+    for idx, file in enumerate(files):
+        try:
+            image_bytes = await file.read()
+            image_bytes_list.append(image_bytes)
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Error reading file {idx + 1}: {str(e)}")
+        
+    operation = parse_multi_operation(image_bytes_list, operation_dict)
+    
+    transformed_image = await apply_multi_transformation(operation, operation_type)
+    return StreamingResponse(io.BytesIO(transformed_image), media_type="image/png")
 
-    result = image_utils.apply_multi_image_operation(image_bytes_list, operation)
+def parse_operation(operation_data: dict) -> ImageOperation:
+    """
+    Parses the operation data into the corresponding ImageOperation.
+
+    - **operation_data**: Dictionary containing operation parameters.
+    - **Returns**: An instance of ImageOperation.
+    """
+    operation_type = operation_data.get('operation_type')
+
+    operation_classes = {
+        'grayscale': GrayscaleOperation,
+        'halftoning': HalftoningOperation,
+        'histogram_equalization': HistogramEqualizationOperation,
+        'histogram_smoothing': HistogramSmoothingOperation,
+        'basic_edge_detection': BasicEdgeDetectionOperation,
+        'advanced_edge_detection': AdvancedEdgeDetectionOperation,
+        'filtering': FilteringOperation,
+        'single_image_operation': SingleImageOperation,
+        'histogram_based_segmentation': HistogramSegmentationOperation,
+        'create_image': CreateImageOperation,
+    }
+
+    operation_class = operation_classes.get(operation_type)
+    if not operation_class:
+        raise HTTPException(status_code=400, detail=f"Unsupported operation_type '{operation_type}'.")
+
+    try:
+        operation = operation_class(**operation_data)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    return operation
+
+def parse_multi_operation(image_list: List, operation_data: dict) -> MultiImageOperation:
+    """
+    Parses the operation data into the corresponding MultiImageOperation.
+
+    - **operation_data**: Dictionary containing operation parameters.
+    - **Returns**: An instance of MultiImageOperation.
+    """
+    operation_type = operation_data.get('operation_type')
+
+    if operation_type != 'multi_image_operation':
+        raise HTTPException(status_code=400, detail=f"Unsupported operation_type '{operation_type}' for multi-image transformation.")
+
+    operation_data['images'] = image_list
+
+    try:
+        operation = MultiImageOperation(**operation_data)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    return operation
+
+async def apply_transformation(image_bytes: bytes, operation: ImageOperation, operation_type: str) -> bytes:
+    """
+    Applies the specified transformation to the image bytes.
+
+    - **image_bytes**: Original image bytes.
+    - **operation**: Parsed ImageOperation instance.
+    - **operation_type**: Type of operation to apply.
+    - **Returns**: Transformed image bytes.
+    """
+    operation_functions = {
+        'grayscale': image_utils.apply_grayscale,
+        'halftoning': image_utils.apply_halftoning,
+        'histogram_equalization': image_utils.apply_histogram_equalization,
+        'histogram_smoothing': image_utils.apply_histogram_smoothing,
+        'basic_edge_detection': image_utils.apply_basic_edge_detection,
+        'advanced_edge_detection': image_utils.apply_advanced_edge_detection,
+        'filtering': image_utils.apply_filtering,
+        'single_image_operation': image_utils.apply_single_image_operation,
+        'histogram_based_segmentation': image_utils.apply_histogram_based_segmentation,
+    }
+
+    apply_function = operation_functions.get(operation_type)
+    if not apply_function:
+        raise HTTPException(status_code=400, detail="Unsupported operation type.")
+
+    result = apply_function(image_bytes, operation)
     if isinstance(result, dict) and "error" in result:
         raise HTTPException(status_code=400, detail=result["error"])
 
-    transformed_image_id = str(uuid4())
-    transformed_image_filename = f"{transformed_image_id}.png"
-    transformed_image_path = os.path.join(IMAGE_DIR, transformed_image_filename)
-    with open(transformed_image_path, "wb") as f:
-        f.write(result.getvalue())
+    transformed_image_bytes = result.getvalue()
+    return transformed_image_bytes
+
+async def apply_multi_transformation(operation: MultiImageOperation, operation_type: str) -> bytes:
+    """
+    Applies the specified multi-image transformation.
+
+    - **image_bytes_list**: List of image bytes.
+    - **operation**: Parsed MultiImageOperation instance.
+    - **Returns**: Transformed image bytes.
+    """
+    result = image_utils.apply_multi_image_operation(operation)
+    if isinstance(result, dict) and "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+    if not isinstance(result, io.BytesIO):
+        raise HTTPException(status_code=500, detail="Unexpected error during multi-image transformation.")
 
     transformed_image_bytes = result.getvalue()
-    metadata = image_utils.get_metadata(transformed_image_bytes, transformed_image_filename)
-    if "error" in metadata:
-        raise HTTPException(status_code=400, detail=metadata["error"])
-    metadata['transformed'] = True
-
-    histogram = image_utils.get_histograms(transformed_image_bytes)
-    if isinstance(histogram, dict) and "error" in histogram:
-        raise HTTPException(status_code=400, detail=histogram["error"])
-    histogram_path = os.path.join(HISTOGRAM_DIR, f"{transformed_image_id}.png")
-    with open(histogram_path, "wb") as f:
-        f.write(histogram.getvalue())
-
-    return ImageResponse(
-        image_id = transformed_image_id,
-        metadata = metadata,
-        histogram_id = transformed_image_id
-    )
-
+    return transformed_image_bytes
